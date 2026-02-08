@@ -1,0 +1,7 @@
+#!/bin/bash
+python3 -m vllm.entrypoints.openai.api_server \
+  --model deepseek-ai/deepseek-coder-1.3b-instruct \
+  --gpu-memory-utilization 0.8 \
+  --max-model-len 4096 \
+  --quantization bitsandbytes \
+  --enforce-eager  # избегаем проблем с памятью
