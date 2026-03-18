@@ -1,113 +1,262 @@
 from pathlib import Path
+from typing import Optional, Callable
 
 from llama_index.core import (
     Settings,
-#    SimpleDirectoryReader,
     Document,
-    StorageContext,
     VectorStoreIndex,
-    load_index_from_storage,
 )
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
+from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from llama_index.core.node_parser import SentenceSplitter
-
-#dataset
 from datasets import load_dataset
+import time
+from qdrant_client import QdrantClient, models
+from qdrant_client.http.models import Distance, VectorParams
 
 
-# --- КОНФИГУРАЦИЯ ---
-PERSIST_DIR = Path("./index_store")
-DATA_DIR = Path("./data")
+# --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+COLLECTION_NAME = "rajpurkar_squad"
+QDRANT_URL = "http://localhost:6333"
+LIMIT = 100
 
-# 1. Настройка моделей (Ollama)
-print("⚙️ Инициализация моделей Ollama...")
-
-# Генеративная модель
-Settings.llm = Ollama(
-    model="qwen3:8b",
-    base_url="http://localhost:11434",
-    request_timeout=300.0,
-    temperature=0,
-)
-
-# Эмбеддинг модель
-Settings.embed_model = OllamaEmbedding(
-    model_name="nomic-embed-text",
-    base_url="http://localhost:11434"
-)
+# 🆕 Состояние инициализации
+_index: Optional[VectorStoreIndex] = None
+_vector_store: Optional[QdrantVectorStore] = None
+_app_initialized = False
 
 
-def get_index():
-    """
-    Создает или загружает векторный индекс.
-    Pattern: Checkpointer (Персистенция)
-    """
-    if not PERSIST_DIR.exists():
-        print(f"📂 Индекс не найден в {PERSIST_DIR}. Создаем новый...")
-
-        #загружаем датасет
-        dataset = load_dataset("rajpurkar/squad", split="validation")
-        documents = [Document(text=t["context"]) for t in dataset]
-
-        seen = set()
-        unique_docs = []
-        for doc in documents:
-            if doc.text not in seen:
-                seen.add(doc.text)
-                unique_docs.append(doc)
-
-
-        #documents = SimpleDirectoryReader(input_dir=DATA_DIR).load_data()
-        print(f"📄 Загружено документов: {len(unique_docs)}")
-
-
-        # Создаем индекс
-        index = VectorStoreIndex.from_documents(unique_docs,show_progress=True)
-
-        # Сохраняем на диск
-        index.storage_context.persist(persist_dir=str(PERSIST_DIR))
-        print("💾 Индекс сохранен!")
+def init_qdrant_vector_store(
+    collection_name: str = COLLECTION_NAME,
+    qdrant_url: str = QDRANT_URL,
+    distance: Distance = Distance.COSINE,
+    vector_size: int = 1024,
+    m: int = 16,
+    ef_construct: int = 100,
+    force_recreate: bool = False
+) -> tuple[QdrantVectorStore, bool]:
+    """Инициализирует Qdrant."""
+    print("⚙️ Инициализация моделей Ollama...")
+    
+    Settings.llm = Ollama(
+        model="qwen3:8b",
+        base_url="http://localhost:11434",
+        request_timeout=300.0,
+        temperature=0,
+    )
+    
+    Settings.embed_model = OllamaEmbedding(
+        model_name="nomic-embed-text",
+        base_url="http://localhost:11434"
+    )
+    
+    client = QdrantClient(url=qdrant_url)
+    is_new = False
+    
+    collection_exists = client.collection_exists(collection_name)
+    
+    if force_recreate or not collection_exists:
+        if collection_exists:
+            print(f"🗑️ Force recreate: удаляем {collection_name}")
+            client.delete_collection(collection_name)
+        
+        print(f"🛠 Создание коллекции HNSW (m={m}, ef_construct={ef_construct})...")
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=vector_size, distance=distance),
+            hnsw_config=models.HnswConfigDiff(m=m, ef_construct=ef_construct)
+        )
+        print("✅ Коллекция готова!")
+        is_new = True
     else:
-        print(f"🚀 Загружаем существующий индекс из {PERSIST_DIR}...")
-        storage_context = StorageContext.from_defaults(persist_dir=str(PERSIST_DIR))
-        index = load_index_from_storage(storage_context)
+        print(f"ℹ️ Используем существующую коллекцию {collection_name}")
+    
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name=collection_name,
+        embedding=Settings.embed_model
+    )
+    
+    return vector_store, is_new
 
+
+def create_index(vector_store: QdrantVectorStore) -> VectorStoreIndex:
+    """Создает индекс в Qdrant."""
+    print("📥 Загрузка SQuAD...")
+    dataset = load_dataset("rajpurkar/squad", split="validation")
+    documents = [Document(text=t["context"]) for t in dataset]
+
+    # Дедупликация
+    seen = set()
+    unique_docs = []
+    prev_doc = None
+    total_docs = len(documents)
+    
+    i = 0
+    for i, doc in enumerate(documents):
+       if doc.text not in seen:
+             seen.add(doc.text)
+
+             metadata = dict(getattr(doc, "metadata", {}) or {})
+             metadata["start"] = i
+             new_doc = Document(text=doc.text, metadata=metadata)
+
+             if prev_doc:
+                prev_doc.metadata["end"] = i - 1
+                unique_docs.append(prev_doc)
+             prev_doc = new_doc
+
+    print(f"TOTAL: {i}")
+    prev_doc.metadata["end"] = i - 1
+    unique_docs.append(prev_doc)
+
+
+
+    print("🔄 Индексация...")
+    index = VectorStoreIndex.from_documents(
+        unique_docs, 
+        vector_store=vector_store,
+        show_progress=True
+    )
+    print("✅ Индексация завершена!")
     return index
 
 
-def get_rag_tool_function():
+def init_app(
+    distance: Distance = Distance.COSINE,
+    m: int = 16,
+    ef_construct: int = 100,
+    force_recreate: bool = False,
+    auto_init: bool = True  # 🆕 Отключение автоинициализации
+):
     """
-    Возвращает функцию поиска, оптимизированную для скорости.
+    Инициализация приложения (автоматическая при импорте).
+    
+    Args:
+        auto_init: False = только инициализировать глобальные переменные
     """
-    index = get_index()
+    global _index, _vector_store, _app_initialized
+    
+    if _app_initialized and not force_recreate:
+        print("⚠️ Приложение уже инициализировано")
+        return
+    
+    print("🚀 init_app()...")
+    vector_store, is_new = init_qdrant_vector_store(
+        distance=distance, m=m, ef_construct=ef_construct,
+        force_recreate=force_recreate
+    )
+    
+    if is_new or force_recreate:
+        index = create_index(vector_store)
+    else:
+        print("⚡ Подключение к существующему Qdrant...")
+        index = VectorStoreIndex.from_documents(
+            [Document(text="init")], vector_store=vector_store
+        )
+    
+    # 🆕 Сохраняем глобально
+    _index = index
+    _vector_store = vector_store
+    _app_initialized = True
+    
+    print("✅ Приложение готово!")
+    
+    if not auto_init:
+        return  # Не выполняем код ниже
 
+
+# 🆕 АВТОИНИЦИАЛИЗАЦИЯ при импорте
+init_app(auto_init=True)
+
+
+def get_index() -> tuple[VectorStoreIndex, QdrantVectorStore]:
+    """Глобальный доступ к индексу."""
+    global _index, _vector_store
+    if not _app_initialized:
+        raise RuntimeError("Запустите init_app() сначала!")
+    return _index, _vector_store
+
+
+def test_whole_dataset(k: int = 5):
+    """Тест ретривера."""
+    
+    start = time.perf_counter()
+    index, _ = get_index()
+    
+    dataset = load_dataset("rajpurkar/squad", split="validation")
+    retriever = index.as_retriever(similarity_top_k=k)
+    counter = 0
+    
+    for i, question in enumerate(dataset[:LIMIT]["question"]):
+        nodes = retriever.retrieve(question)
+        for node in nodes:
+            if (node.metadata.get("start", 0) <= i <= 
+                node.metadata.get("end", float('inf'))):
+#                print(node.metadata.get("start", 0),"-",node.metadata.get("end", float('inf')))
+                counter += 1
+                break
+    
+    print(f"✅ точность: {counter}/{LIMIT} ({counter/LIMIT*100:.1f}%)")
+    print(f"⏱ общее время тестирования: {time.perf_counter()-start:.2f}с")
+
+
+def get_rag_tool_function() -> Callable:
+    """RAG функция."""
+    index, _ = get_index()
     retriever = index.as_retriever(similarity_top_k=7)
 
     def search_knowledge_base(query: str) -> str:
-        """Поиск информации в базе знаний технической поддержки."""
-        # 1. Получаем список узлов (Nodes)
         nodes = retriever.retrieve(query)
-
-        # 2. Собираем текст из узлов вручную
-        context_str = "\n\n".join(
-            [f"--- Источник {i + 1} ---\n{node.get_content()}" for i, node in enumerate(nodes)],
-        )
-
-        return context_str
-
+        return "\n\n".join([
+            f"--- Источник {i+1} ---\n{node.get_content()}" 
+            for i, node in enumerate(nodes)
+        ])
     return search_knowledge_base
 
 
-# Блок для быстрого теста
+# 🆕 Утилиты
+def is_initialized() -> bool:
+    """Проверка состояния инициализации."""
+    global _app_initialized
+    return _app_initialized
+
+def recreate_index(
+    distance: Distance = Distance.COSINE,
+    m: int = 16, 
+    ef_construct: int = 100
+):
+    """Пересоздать индекс с новыми параметрами."""
+    init_app(force_recreate=True, distance=distance, m=m, ef_construct=ef_construct)
+
+
 if __name__ == "__main__":
-    tool = get_rag_tool_function()
-    print("\n--- ТЕСТ ПОИСКА ---")
-    while True:
-        user_input = input("\nВы: ")
-        if user_input.lower() in ["q", "exit", "quit"]:
-            print("До свидания!")
-            break
-        res = tool(user_input)
-        print(res)
+    print("🧪 Тестирование...")
+    print(f"Параметры подсчет расстояния:Distance.COSINE, m = 16, ef_construct = 100, кол -во фрагментов:5 ")
+    recreate_index()
+    test_whole_dataset()
+
+    print(f"Параметры подсчет расстояния:Distance.EUCLID, m = 16, ef_construct = 100, кол -во фрагментов:5 ")
+    recreate_index(distance = Distance.EUCLID)
+    test_whole_dataset()
+
+    print(f"Параметры подсчет расстояния:Distance.COSINE, m = 16, ef_construct = 100, кол -во фрагментов:6 ")
+    recreate_index()
+    test_whole_dataset(k=6)
+
+    print(f"Параметры подсчет расстояния:Distance.COSINE, m = 16, ef_construct = 100, кол -во фрагментов:7 ")
+    recreate_index()
+    test_whole_dataset(k=7)
+
+    print(f"Параметры подсчет расстояния:Distance.COSINE, m = 24, ef_construct = 200, кол -во фрагментов:7 ")
+    recreate_index(m = 24, ef_construct = 200)
+    test_whole_dataset(k=7)
+
+    print(f"Параметры подсчет расстояния:Distance.COSINE, m = 32, ef_construct = 300, кол -во фрагментов:7 ")
+    recreate_index(m = 32, ef_construct = 300)
+    test_whole_dataset(k=7)
+
+
+#    rag = get_rag_tool_function()
+#    print(rag("capital of France")[:200])
