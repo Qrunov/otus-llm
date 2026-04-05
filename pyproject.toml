@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vikhr-langgraph-agent"
+version = "0.1.0"
+description = "Агент vLLM (Vikhr Gemma): часовой пояс + курс к USD. Запуск: uv run agent.py; vLLM только через docker compose (сервис vllm)"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.2.55",
+    "langchain>=0.3.14",
+    "langchain-openai>=0.3.0",
+    "langchain-core>=0.3.28",
+    "geopy>=2.4.1",
+    "timezonefinder>=6.5.2",
+    "python-dotenv>=1.0.1",
+]
+
+[tool.setuptools]
+py-modules = ["agent"]

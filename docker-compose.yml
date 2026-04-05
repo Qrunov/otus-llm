@@ -1,0 +1,70 @@
+# В .env: VLLM_BASE_URL=http://127.0.0.1:${VLLM_HOST_PORT:-8000}/v1
+#
+# Профиль: bfloat16, eager, chunked prefill, block_size, HF-токен.
+# На старте vLLM нужна свободная VRAM ≥ gpu_memory_utilization × полный объём GPU.
+# LangChain → tool_choice=auto: на vLLM нужны --enable-auto-tool-choice и --tool-call-parser.
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vikhr-vllm
+    restart: unless-stopped
+    ipc: host
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "${VLLM_HOST_PORT:-8000}:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./models:/models
+      - ./lora:/lora:ro
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      PYTORCH_ALLOC_CONF: expandable_segments:True
+      NVIDIA_VISIBLE_DEVICES: all
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN:-}
+    command:
+      - Vikhrmodels/Vikhr-Gemma-2B-instruct
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --dtype
+      - bfloat16
+      - --gpu-memory-utilization
+      - "${VLLM_GPU_MEMORY_UTILIZATION:-0.68}"
+      - --max-model-len
+      - "${VLLM_MAX_MODEL_LEN:-512}"
+      - --trust-remote-code
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - "${VLLM_TOOL_CALL_PARSER:-hermes}"
+      - --enforce-eager
+      - --disable-log-stats
+      - "--max_num_batched_tokens=${VLLM_MAX_NUM_BATCHED_TOKENS:-1024}"
+      - "--max_num_seqs=${VLLM_MAX_NUM_SEQS:-1}"
+      - "--block_size=${VLLM_BLOCK_SIZE:-16}"
+      - --enable-lora
+      - --lora-modules
+      - "${VLLM_LORA_MODULE:-vikhr-lora=/lora}"
+      - --max-lora-rank
+      - "${VLLM_MAX_LORA_RANK:-8}"
+      - --max-loras
+      - "${VLLM_MAX_LORAS:-1}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/models', timeout=25)",
+        ]
+      interval: 20s
+      timeout: 30s
+      retries: 60
+      start_period: 900s
