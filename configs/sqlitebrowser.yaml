@@ -1,0 +1,44 @@
+# DB Browser for SQLite (datasets/sqlitebrowser): Qt + SQL middle layer in datasets/samples.jsonl
+# compile_commands: from repo root —
+#   cd datasets/sqlitebrowser && cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+#     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DQT_MAJOR=Qt6 && cmake --build build
+project_root: datasets/sqlitebrowser
+compile_commands: build/sqlitebrowser/compile_commands.json
+output_dir: eval_runs
+
+openai_base_url: http://127.0.0.1:8000/v1
+openai_api_key: dummy
+#model: Qwen/Qwen2.5-7B-Instruct-AWQ
+model: Qwen/Qwen2.5-7B-Instruct-AWQ
+#model: gitarist/deepseek-coder-6.7b-instruct-gptq-athome
+temperature: 0.2
+max_tokens: 1020
+# Structured `suggest` uses its own completion budget (tool JSON can be large).
+suggest_max_tokens: 512
+suggest_cpp_max_chars: 1000000
+suggest_ast_max_chars: 1000000
+
+max_expand_iterations: 0
+model_max_total_tokens: 2800
+seed_ast_usr_enabled: false
+seed_call_sites_enabled: false
+seed_primary_only: false
+ast_enabled: false
+# When false (default): greedy local seed can grow across the whole file (needed for short functions).
+# Set true if the seed pulls in sibling methods in the same class (e.g. RunSql) while AST is off.
+seed_cap_local_expand_to_enclosing_function_without_ast: false
+context_line_padding: 30
+
+token_budget_margin: 100
+
+
+langfuse_enabled: true
+
+
+# MLflow experiment tracking (run-level history + metric charts).
+# Enable with `mlflow_enabled: true` or env `MLFLOW_ENABLED=true`.
+mlflow_enabled: true
+# Optional; defaults to local ./mlruns if unset.
+mlflow_tracking_uri: null
+# MLflow "experiment" name (not to be confused with astrag experiment_id).
+mlflow_experiment_name: astrag

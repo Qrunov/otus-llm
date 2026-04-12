@@ -1,0 +1,17 @@
+#!/bin/bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-ee404593-8916-41ba-9ff6-446ba7e35540
+export LANGFUSE_SECRET_KEY=sk-lf-30195476-cf09-42a9-a317-d35d524786c8
+export LANGFUSE_HOST=http://localhost:3000
+
+export MLFLOW_ENABLED=true
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5001
+export MLFLOW_EXPERIMENT_NAME=astrag
+
+#no_expand expand_s expand_f expand_e against
+
+
+EXPERIMENT=expand_gr
+
+
+uv run astrag ingest-scores eval/$EXPERIMENT.json
+uv run astrag mlflow-ingest-scores --experiment-id $EXPERIMENT eval/$EXPERIMENT.json

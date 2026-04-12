@@ -1,0 +1,43 @@
+# OpenAI-compatible vLLM server (requires NVIDIA GPU on the host).
+# Start (from repo root): docker compose -f compose.yaml up -d
+# Docs: https://docs.vllm.ai/en/latest/deployment/docker.html
+#
+# Образ: задайте `VLLM_IMAGE` (полный ref) или оставьте дефолт — пин на свежий стабильный релиз вместо
+# непредсказуемого `:latest`. Ночные сборки: `VLLM_IMAGE=vllm/vllm-openai:nightly` (CUDA/теги см. Docker Hub).
+
+
+services:
+  vllm-openai:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.19.0}
+    restart: unless-stopped
+    ipc: host
+    shm_size: "4g"
+    ports:
+      - "${VLLM_PORT:-8000}:8000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HOME: /root/.cache/huggingface
+      PYTORCH_ALLOC_CONF: ${PYTORCH_ALLOC_CONF:-expandable_segments:True}
+    volumes:
+      - ${HF_CACHE_HOST:-${HOME}/.cache/huggingface}:/root/.cache/huggingface
+    # ENTRYPOINT образа: `vllm serve` — первым в command идёт id модели (vLLM ≥0.18).
+    command:
+      - ${VLLM_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - --quantization
+      - ${VLLM_QUANTIZATION:-awq}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.65}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-2560}
+      - --enforce-eager
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,15 @@
+# Astrag: orchestrate optional stacks (Langfuse self-hosted + optional vLLM).
+# Compose v2.20+ (docker compose include).
+#
+# Langfuse UI: http://localhost:3000
+# vLLM OpenAI API: http://localhost:8000/v1
+#
+# Example:
+#   docker compose up -d
+
+name: astrag
+
+include:
+  - path: infra/compose/langfuse.docker-compose.yml
+  - path: infra/compose/vllm.docker-compose.yml
+  - path: infra/compose/mlflow.docker-compose.yml

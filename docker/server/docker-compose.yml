@@ -1,0 +1,23 @@
+# Dev: image provides deps; bind-mount overlays the full repo at /workspace.
+# Set OPENAI_BASE_URL to a host LLM (vLLM, etc.). On Linux, host-gateway reaches the host.
+
+services:
+  astrag-server:
+    build:
+      context: ../..
+      dockerfile: docker/server/Dockerfile
+    ports:
+      - "${ASTRAG_PORT:-8765}:8765"
+    environment:
+      ASTRAG_CONFIG_PATH: ${ASTRAG_CONFIG_PATH:-/workspace/configs/sqlitebrowser.yaml}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://host.docker.internal:8000/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
+      # Override YAML when keys / tracking are not available in the container
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      MLFLOW_ENABLED: ${MLFLOW_ENABLED:-false}
+      # Optional: require clients to send header X-Astrag-Token (same value)
+      # ASTRAG_SERVER_TOKEN: ${ASTRAG_SERVER_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../..:/workspace

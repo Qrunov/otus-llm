@@ -1,0 +1,30 @@
+# MLflow Tracking Server (local experiment history + metric charts)
+#
+# UI: http://localhost:${MLFLOW_PORT:-5001}
+# Artifacts + DB are persisted in a named volume `mlflow_data`.
+#
+# Note: FileStore (./mlruns) is deprecated (Feb 2026) and breaks some UI features.
+# This uses SQLite backend store to enable datasets/evaluation UI endpoints.
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.15.1
+    restart: unless-stopped
+    ports:
+      - "${MLFLOW_PORT:-5001}:5000"
+    command:
+      - mlflow
+      - server
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - "sqlite:////mlflow/mlflow.db"
+      - --default-artifact-root
+      - "file:/mlflow/artifacts"
+    volumes:
+      - mlflow_data:/mlflow
+
+volumes:
+  mlflow_data:

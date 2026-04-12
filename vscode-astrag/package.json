@@ -1,0 +1,92 @@
+{
+  "name": "astrag-explain",
+  "displayName": "Astrag Explain",
+  "description": "Send the current selection to Astrag (C++ AST + LLM) and show the explanation in a panel.",
+  "version": "0.1.0",
+  "publisher": "astrag",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:astrag.explainSelection", "onCommand:astrag.showOutput"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "astrag.explainSelection",
+        "title": "Astrag: Explain selection"
+      },
+      {
+        "command": "astrag.showOutput",
+        "title": "Astrag: Show log (Output)"
+      }
+    ],
+    "configuration": {
+      "title": "Astrag",
+      "properties": {
+        "astrag.configPath": {
+          "type": "string",
+          "default": "configs/default.yaml",
+          "description": "Path to Astrag YAML config, relative to workspace folder unless absolute."
+        },
+        "astrag.cliCommand": {
+          "type": "string",
+          "default": "astrag",
+          "description": "Used only when launchViaPython is false: executable name or full path (e.g. /path/to/.venv/bin/astrag)."
+        },
+        "astrag.launchViaPython": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, runs `pythonPath -m astrag.bench.cli vscode-explain` (avoids ENOENT when `astrag` is not on the IDE PATH)."
+        },
+        "astrag.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Python for -m mode. Empty: `python.defaultInterpreterPath`, then python3 / python."
+        },
+        "astrag.cliCwd": {
+          "type": "string",
+          "default": "",
+          "description": "Working directory for the CLI. Empty = workspace folder (where compile_commands + config paths resolve)."
+        },
+        "astrag.sourceRoot": {
+          "type": "string",
+          "default": "",
+          "description": "If set, paths are relative to workspaceFolder/sourceRoot (must match project_root in Astrag YAML)."
+        },
+        "astrag.mode": {
+          "type": "string",
+          "enum": ["http", "cli"],
+          "default": "http",
+          "description": "http: Astrag server over network (default). cli: local python/astrag process."
+        },
+        "astrag.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8765",
+          "description": "Base URL of astrag-server (no trailing slash)."
+        },
+        "astrag.serverToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional X-Astrag-Token if ASTRAG_SERVER_TOKEN is set on the server."
+        },
+        "astrag.requestTimeoutMs": {
+          "type": "number",
+          "default": 600000,
+          "description": "HTTP: max wait for /v1/explain (ms). CLI: kill child after this. Default 10 min."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

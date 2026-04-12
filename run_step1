@@ -1,0 +1,17 @@
+#!/bin/bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-ee404593-8916-41ba-9ff6-446ba7e35540
+export LANGFUSE_SECRET_KEY=sk-lf-30195476-cf09-42a9-a317-d35d524786c8
+export LANGFUSE_HOST=http://127.0.0.1:3000   # или твой URL Langfuse
+export LANGFUSE_ENABLED=true
+
+export MLFLOW_ENABLED=true
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5001
+export MLFLOW_EXPERIMENT_NAME=astrag
+
+#export ASTRAG_DEBUG_AST_USR=0 
+unset ASTRAG_DEBUG_AST_USR
+unset ASTRAG_SEED_TRACE
+
+export EXPERIMENT=expand_gr
+#uv run astrag run --verbose --config configs/sqlitebrowser.yaml --dataset datasets/samples.jsonl --experiment-id $EXPERIMENT
+uv run astrag run --config configs/sqlitebrowser.yaml --dataset datasets/samples.jsonl --experiment-id $EXPERIMENT
