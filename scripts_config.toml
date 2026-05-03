@@ -1,0 +1,56 @@
+# Общие настройки для скриптов проекта (пути по умолчанию можно переопределить аргументами CLI).
+
+[embedding]
+# Модель sentence-transformers с поддержкой изображений (см. https://www.sbert.net/docs/sentence_transformer/pretrained_models.html).
+#model = "clip-ViT-B-32"
+# Другие модели: оставь одну активную строку model (закомментируй или удали текущую выше).
+# Короткие имена (документация SBERT, тот же API encode для текста и PIL-изображений):
+# model = "clip-ViT-B-16"
+# model = "clip-ViT-L-14"
+# model = "clip-ViT-L-14-336"
+# model = "clip-ViT-B-32-multilingual-v1"
+# model = "clip-ViT-L-14-multilingual-v1"
+# Те же CLIP на Hugging Face под организацией sentence-transformers:
+# model = "sentence-transformers/clip-ViT-B-32"
+# model = "sentence-transformers/clip-ViT-B-16"
+# model = "sentence-transformers/clip-ViT-L-14"
+# model = "sentence-transformers/clip-ViT-L-14-336"
+# model = "sentence-transformers/clip-ViT-B-32-multilingual-v1"
+# model = "sentence-transformers/clip-ViT-L-14-multilingual-v1"
+# Qwen3-VL-Embedding (мультимодальные энкодеры; sentence-transformers >= 5.4, см. карточки моделей и https://github.com/QwenLM/Qwen3-VL-Embedding):
+ model = "Qwen/Qwen3-VL-Embedding-2B"
+#model = "Qwen/Qwen3-VL-Embedding-8B"
+# Google SigLIP / SigLIP 2 (общий вектор для картинки и текста; обычно ST >= 5.4 и extras: pip install "sentence-transformers[image]"):
+# model = "google/siglip-base-patch16-224"
+# model = "google/siglip-large-patch16-384"
+# model = "google/siglip-so400m-patch14-384"
+#model = "google/siglip2-base-patch16-224"
+# Устройство: auto | cuda | cpu.
+device = "auto"
+# Размер микробатча при model.encode (картинки). Тяжёлые VLM — мало; CLIP обычно выдерживает 16–32.
+batch_size = 4
+# Сколько векторов накопить перед одним collection.add (меньше вызовов Chroma = быстрее; рост ОЗУ ~ N×dim×4 байт).
+chroma_add_batch = 1024
+# Минимальная сторона после декодирования (апскейл при меньшем размере). Иначе 1×1 → [3,1,1] и предупреждение transformers.
+min_image_side = 32
+# Длинная сторона не больше N px перед encode (меньше ОЗУ на 4K и т.д.). 0 — не ограничивать. Если ключа нет — по умолчанию 1024 в коде.
+max_input_edge = 4096
+
+[vector_store]
+# Локальная персистентная база ChromaDB.
+path = "data/chroma_db"
+collection = "conceptual_captions"
+
+[retrieval]
+# Топ-k по умолчанию: поиск (search_*) и метрика Recall@k (evaluate_image_retrieval). Переопределение: флаг -k.
+top_k = 100
+
+[indexing]
+# JSON из fetch_conceptual_captions_subset.py: список объектов { image_url, caption }.
+input_json = "conceptual_captions_verified.json"
+timeout_sec = 15.0
+
+[cache]
+# Сырые байты ответа по URL (имя файла = SHA-256 URL, суффикс .img). Пустой image_dir — не кэшировать.
+# enabled = false — выключить, не меняя путь.
+image_dir = "image_cache"
