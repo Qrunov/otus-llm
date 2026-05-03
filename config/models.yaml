@@ -1,0 +1,39 @@
+server:
+  base_url: "http://localhost:8080"
+  endpoint: "/completion"
+  timeout_sec: 120
+  max_tokens: 128
+  temperature: 0.0
+  top_p: 0.95
+
+defaults:
+  input_goldens: "tests/goldens.json"
+  output_predictions: "tests/predictions.json"
+  prompt_template: |
+    You are a concise QA assistant.
+    Answer the question in one short sentence.
+    Question: {question}
+    Answer:
+
+models:
+  qwen3-8b-q4km:
+    hf_repo: "Qwen/Qwen3-8B-GGUF"
+    hf_file: "Qwen3-8B-Q4_K_M.gguf"
+    size_hint: "~5.2GB"
+    vram_note: "Good default for 16GB vGPU, leaves headroom for long context."
+    context_size: 4096
+    gpu_layers: 99
+  mistral-7b-instruct-q5km:
+    hf_repo: "MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF"
+    hf_file: "Mistral-7B-Instruct-v0.3.Q5_K_M.gguf"
+    size_hint: "~5.8GB"
+    vram_note: "More quality than Q4 while staying comfortable on 16GB."
+    context_size: 4096
+    gpu_layers: 99
+  phi-3-mini-4k-q5km:
+    hf_repo: "bartowski/Phi-3-mini-4k-instruct-GGUF"
+    hf_file: "Phi-3-mini-4k-instruct-Q5_K_M.gguf"
+    size_hint: "~2.4GB"
+    vram_note: "Fast option for batch evaluation, lowest memory footprint."
+    context_size: 4096
+    gpu_layers: 99

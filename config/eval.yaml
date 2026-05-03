@@ -1,0 +1,33 @@
+evaluation:
+  input_predictions: "tests/predictions.json"
+  output_report: "tests/eval_answer_relevance.json"
+  metrics:
+    - "answer_relevancy"
+    - "faithfulness"
+    - "context_recall"
+  skip_errors: true
+  batch_size: 1
+  raise_exceptions: false
+  start: 0
+  limit: 30
+  request_delay_ms: 800
+  answer_relevancy_strictness: 1
+
+run_config:
+  timeout_sec: 180
+  max_retries: 20
+  max_wait_sec: 120
+  max_workers: 1
+  log_retries: false
+
+yandex:
+  api_base: "https://llm.api.cloud.yandex.net/v1"
+  model: ""
+  timeout_sec: 120
+  temperature: 0.0
+
+embeddings:
+  provider: "local"
+  model_name: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  device: "cpu"
+  normalize_embeddings: true

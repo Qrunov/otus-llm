@@ -1,0 +1,33 @@
+[project]
+name = "ex9"
+version = "0.1.0"
+description = "Golden QA fixtures from SQuAD (rajpurkar/squad)."
+requires-python = ">=3.11"
+dependencies = [
+    "datasets>=4.8.0",
+    "huggingface-hub>=1.0.0",
+    "langchain-huggingface>=0.3.1",
+    "langchain-openai>=0.3.26",
+    "langfuse>=3.0.0",
+    "openai>=1.0.0",
+    "pandas>=2.3.0",
+    "pyyaml>=6.0.2",
+    "ragas>=0.2.10",
+    "requests>=2.32.0",
+    "sentence-transformers>=5.1.0",
+    "py-spy",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+norecursedirs = ["models", ".git", ".venv", "*.egg", "build", "dist"]
+markers = [
+    "integration: full RAGAS report via run_evaluation_report (Yandex judge)",
+]
