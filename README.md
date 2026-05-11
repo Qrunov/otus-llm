@@ -8,8 +8,6 @@
 
 `PERSON`, `ORG`, `MONEY`, `DATE`, `CONTRACT_TYPE`, `OBLIGATION`, `JURISDICTION`
 
-Исторический опечаточный ключ `JURISTICTION` при чтении эталона в **`evaluate_legal_ie.py`** учитывается и склеивается с `JURISDICTION`.
-
 ## Эталон: `data/gold.json`
 
 В репозитории есть **`data/gold.json`** — эталонные ответы для оценки извлечения.
