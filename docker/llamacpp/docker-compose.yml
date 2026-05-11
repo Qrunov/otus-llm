@@ -1,0 +1,46 @@
+# Single llama-server: one GGUF from ./models, one port (default 8080).
+#
+#   cd docker/llamacpp && cp .env.example .env
+#   docker compose pull && docker compose up
+#
+# CPU: LLAMA_SERVER_IMAGE=ghcr.io/ggml-org/llama.cpp:server, N_GPU_LAYERS=0
+# NVIDIA: server-cuda (or server-cuda13), N_GPU_LAYERS=-1, nvidia-container-toolkit, nvidia-smi OK on host.
+#
+# N_CTX default 8192 — align with scripts/extract_legal_entities_llm.py --server-context / LLAMA_N_CTX.
+# N_PARALLEL = llama-server -np (slots for concurrent /completion). Set ≥ extract script --batch-size.
+# Continuous batching (dynamic batching) is enabled in llama-server by default (-cb).
+
+name: nner-llamacpp
+
+services:
+  llama-server:
+    image: ${LLAMA_SERVER_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    pull_policy: always
+    environment:
+      LD_LIBRARY_PATH: /app
+    working_dir: /models
+    volumes:
+      - ${LLAMA_MODELS_DIR:-./models}:/models:ro
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    shm_size: 1gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      - -m
+      - ${GGUF_FILE:-llama-2-7b-chat.Q4_K_M.gguf}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8080"
+      - -c
+      - "${N_CTX:-8192}"
+      - --n-gpu-layers
+      - "${N_GPU_LAYERS:-0}"
+      - -np
+      - "${N_PARALLEL:-4}"
